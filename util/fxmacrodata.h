@@ -21,6 +21,11 @@ class FxMacroDataClient {
   // If api_key is empty, the FXMACRODATA_API_KEY environment variable is used.
   // The key is sent in the X-API-Key header. USD announcements, the USD
   // calendar and the USD data catalogue also work without a key.
+  //
+  // List endpoints (announcements, predictions, forex, COT, commodities)
+  // return 20 rows by default and at most 100 per request, newest first.
+  // Pass {"limit", "100"} and {"offset", "..."} in params and follow
+  // pagination.next_offset while pagination.has_more is true.
   explicit FxMacroDataClient(
       std::string api_key = "",
       std::string base_url = "https://api.fxmacrodata.com/v1",

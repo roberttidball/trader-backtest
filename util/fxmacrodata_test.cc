@@ -63,10 +63,13 @@ TEST(FxMacroDataClientTest, BuildsAuthenticatedRestRequests) {
             "https://api.fxmacrodata.com/v1/rate_differentials/eur/usd"
             "?measure=spread");
 
-  client.Forex("EUR", "USD", {{"start_date", "2026-01-01"}});
+  client.Forex("EUR", "USD",
+               {{"start_date", "2026-01-01"},
+                {"limit", "100"},
+                {"offset", "200"}});
   EXPECT_EQ(url,
             "https://api.fxmacrodata.com/v1/forex/eur/usd"
-            "?start_date=2026-01-01");
+            "?start_date=2026-01-01&limit=100&offset=200");
 
   client.MarketSessions();
   EXPECT_EQ(url, "https://api.fxmacrodata.com/v1/market_sessions");
