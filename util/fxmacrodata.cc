@@ -3,6 +3,7 @@
 #include "util/fxmacrodata.h"
 
 #include <cctype>
+#include <cstdlib>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -45,21 +46,21 @@ std::string Encode(const std::string& value) {
   return out.str();
 }
 
+std::string ApiKeyFromEnv() {
+  const char* value = std::getenv("FXMACRODATA_API_KEY");
+  return value == nullptr ? "" : value;
+}
+
 }  // namespace
 
-FxMacroDataClient::FxMacroDataClient(std::string api_key,
-                                     std::string base_url,
+FxMacroDataClient::FxMacroDataClient(std::string api_key, std::string base_url,
                                      Transport transport)
-    : api_key_(std::move(api_key)),
+    : api_key_(api_key.empty() ? ApiKeyFromEnv() : std::move(api_key)),
       base_url_(TrimTrailingSlash(std::move(base_url))),
       transport_(std::move(transport)) {}
 
 std::string FxMacroDataClient::BuildUrl(const std::string& path,
                                         QueryParams params) const {
-  if (!api_key_.empty()) {
-    params.push_back({"api_key", api_key_});
-  }
-
   std::ostringstream url;
   url << base_url_ << EnsureLeadingSlash(path);
   char separator = '?';
@@ -71,13 +72,21 @@ std::string FxMacroDataClient::BuildUrl(const std::string& path,
 }
 
 std::string FxMacroDataClient::Send(const std::string& method,
-                                    const std::string& path,
-                                    QueryParams params,
+                                    const std::string& path, QueryParams params,
                                     const std::string& body) const {
   if (!transport_) {
     throw std::runtime_error("FxMacroDataClient requires a transport callback");
   }
-  return transport_(method, BuildUrl(path, std::move(params)), body);
+  return transport_(method, BuildUrl(path, std::move(params)), BuildHeaders(),
+                    body);
+}
+
+FxMacroDataClient::Headers FxMacroDataClient::BuildHeaders() const {
+  Headers headers = {{"Accept", "application/json"}};
+  if (!api_key_.empty()) {
+    headers.push_back({"X-API-Key", api_key_});
+  }
+  return headers;
 }
 
 std::string FxMacroDataClient::DataCatalogue(const std::string& currency,
@@ -89,9 +98,10 @@ std::string FxMacroDataClient::DataCatalogue(const std::string& currency,
 std::string FxMacroDataClient::Announcements(const std::string& currency,
                                              const std::string& indicator,
                                              QueryParams params) const {
-  return Send("GET", "/announcements/" + Encode(Lower(currency)) + "/" +
-                        Encode(indicator),
-              std::move(params));
+  return Send(
+      "GET",
+      "/announcements/" + Encode(Lower(currency)) + "/" + Encode(indicator),
+      std::move(params));
 }
 
 std::string FxMacroDataClient::LatestAnnouncements(const std::string& currency,
@@ -112,16 +122,17 @@ std::string FxMacroDataClient::Calendar(const std::string& currency,
 std::string FxMacroDataClient::Predictions(const std::string& currency,
                                            const std::string& indicator,
                                            QueryParams params) const {
-  return Send("GET", "/predictions/" + Encode(Lower(currency)) + "/" +
-                        Encode(indicator),
-              std::move(params));
+  return Send(
+      "GET",
+      "/predictions/" + Encode(Lower(currency)) + "/" + Encode(indicator),
+      std::move(params));
 }
 
 std::string FxMacroDataClient::Forex(const std::string& base,
                                      const std::string& quote,
                                      QueryParams params) const {
-  return Send("GET", "/forex/" + Encode(Lower(base)) + "/" +
-                        Encode(Lower(quote)),
+  return Send("GET",
+              "/forex/" + Encode(Lower(base)) + "/" + Encode(Lower(quote)),
               std::move(params));
 }
 
@@ -159,16 +170,18 @@ std::string FxMacroDataClient::ForwardCurves(const std::string& currency,
 std::string FxMacroDataClient::RateDifferentials(const std::string& base,
                                                  const std::string& quote,
                                                  QueryParams params) const {
-  return Send("GET", "/rate_differentials/" + Encode(Lower(base)) + "/" +
-                        Encode(Lower(quote)),
-              std::move(params));
+  return Send(
+      "GET",
+      "/rate_differentials/" + Encode(Lower(base)) + "/" + Encode(Lower(quote)),
+      std::move(params));
 }
 
 std::string FxMacroDataClient::ForwardDifferentials(const std::string& base,
                                                     const std::string& quote,
                                                     QueryParams params) const {
-  return Send("GET", "/forward_differentials/" + Encode(Lower(base)) + "/" +
-                        Encode(Lower(quote)),
+  return Send("GET",
+              "/forward_differentials/" + Encode(Lower(base)) + "/" +
+                  Encode(Lower(quote)),
               std::move(params));
 }
 
@@ -191,15 +204,8 @@ std::string FxMacroDataClient::PressReleases(const std::string& currency,
               std::move(params));
 }
 
-std::string FxMacroDataClient::Graphql(const std::string& query,
-                                       const std::string& variables_json) const {
-  return Send("POST", "/graphql", {},
-              "{\"query\":\"" + query + "\",\"variables\":" + variables_json + "}");
-}
-
 std::string FxMacroDataClient::Request(const std::string& path,
-                                       QueryParams params,
-                                       std::string method,
+                                       QueryParams params, std::string method,
                                        std::string body) const {
   return Send(std::move(method), path, std::move(params), body);
 }
